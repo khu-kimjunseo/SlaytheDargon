@@ -96,7 +96,6 @@ def new_game():
     game_layer = MoveLayer(hud, scenario)
     return cocos.scene.Scene(background, game_layer, hud)
 
-
 def game_over():
     w, h = director.get_window_size()
     layer = cocos.layer.Layer()
@@ -124,7 +123,6 @@ class BattleLayer(cocos.layer.Layer):
         cards = self.collman.objs_touching_point(x, y)
         if len(cards):
             card = next(iter(cards))
-            card.do(ac.ScaleTo(0.2, 1))
             card.kill()
 
     def __init__(self, hud, scenario, player, enemy):
@@ -140,10 +138,10 @@ class BattleLayer(cocos.layer.Layer):
 
         self.return_pos = self.player.position
 
-        self.player.position = (100, 300)
-        self.player.cshape.center = (100,300)
-        self.enemy.position = (540, 300)
-        self.enemy.cshape.center = (540, 300)
+        self.player.position = (200, 0.75*self.height)
+        self.player.cshape.center = (200, 0.75*self.height)
+        self.enemy.position = (self.width-200, 0.75*self.height)
+        self.enemy.cshape.center = (self.width-200, 0.75*self.height)
         self.card_i = 0
         random.shuffle(self.player.decks)
         
@@ -163,8 +161,8 @@ class BattleLayer(cocos.layer.Layer):
                 random.shuffle(self.player.decks)
                 self.card_i = 0
             cards.append(self.player.decks[self.card_i])
-            cards[i].position = (100 + 100*i, 0)
-            cards[i].cshape.center = (100 + 100*i, 0)
+            cards[i].position = (0.5 * self.width + 100*(i-2), 0)
+            cards[i].cshape.center = (0.5 * self.width + 100*(i-2), 0)
             self.add(cards[i])
             self.collman.add(cards[i])
             self.card_i += 1
