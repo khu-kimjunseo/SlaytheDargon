@@ -1,5 +1,7 @@
 import random
 
+from pyglet.window import key
+
 from cocos.director import director
 from cocos.scenes.transitions import SplitColsTransition, FadeTransition
 import cocos.layer
@@ -7,10 +9,11 @@ import cocos.scene
 import cocos.text
 import cocos.actions as ac
 import cocos.collision_model as cm
+from cocos.scenes.transitions import FadeTRTransition
 
 import actors
 import mainmenu
-from scenario import get_scenario
+import scenario as sc
 
 player_img = 'assets/tank.png'
 
@@ -29,15 +32,43 @@ class MoveLayer(cocos.layer.Layer):
         w, h = director.get_window_size()
         self.width = w
         self.height = h
+
         self.player = actors.Player(player_img, w * 0.5, 50)
         self.add(self.player)
+        self.enemy0 = actors.Enemy(player_img, 300, 300)
+        self.add(self.enemy0)
+
         cell_size = 32
-        self.coll_man = cm.CollisionManagerGrid(0, w, 0, h, cell_size, cell_size)
+        self.collman = cm.CollisionManagerGrid(0, w, 0, h, cell_size, cell_size)
         self.schedule(self.game_loop)
 
     def game_loop(self, elapsed):
         self.player.update(elapsed)
 
+        self.collman.clear()
+        for _, node in self.children:
+            self.collman.add(node)
+            if not self.collman.knows(node):
+                self.remove(node)
+        for _, node in self.children:
+            if isinstance(node, actors.Player):
+                enemy = self.collide(node)
+                if enemy is not None:
+                    director.push(FadeTRTransition(new_battle(node, enemy), duration=2))
+        
+        for _, node in self.children:
+            if isinstance(node, actors.Enemy):
+                if node.hp == 0:
+                    if node.is_running:
+                        self.remove(node)
+
+    def collide(self, node):
+        if node is not None:
+            for other in self.collman.iter_colliding(node):
+                node.collide(other)
+                return other
+        return None
+        
 class Move_HUD(cocos.layer.Layer):
     def __init__(self):
         super(Move_HUD, self).__init__()
@@ -59,9 +90,9 @@ class Move_HUD(cocos.layer.Layer):
         self.score_points.element.text = 'Points: %s' % points
 
 def new_game():
-    scenario = get_scenario()
+    scenario = sc.get_move_scenario()
     background = scenario.get_background()
-    hud = HUD()
+    hud = Move_HUD()
     game_layer = MoveLayer(hud, scenario)
     return cocos.scene.Scene(background, game_layer, hud)
 
@@ -81,3 +112,67 @@ def game_over():
 
 class BattleLayer(cocos.layer.Layer):
     is_event_handler = True
+
+    def on_key_press(self, k, _):
+        if k == key.Q:
+            self.enemy.hp = 0
+            # self.enemy.kill()
+            self.player.position = self.return_pos
+            director.pop()
+    
+    def on_mouse_press(self, x, y, buttons, mod):
+        cards = self.collman.objs_touching_point(x, y)
+        if len(cards):
+            card = next(iter(cards))
+            card.do(ac.ScaleTo(0.2, 1))
+            card.kill()
+
+    def __init__(self, hud, scenario, player, enemy):
+        super(BattleLayer, self).__init__()
+        self.hud = hud
+        w, h = director.get_window_size()
+        self.width = w
+        self.height = h
+        self.player = player
+        self.add(self.player)
+        self.enemy = enemy
+        self.add(self.enemy)
+
+        self.return_pos = self.player.position
+
+        self.player.position = (100, 300)
+        self.player.cshape.center = (100,300)
+        self.enemy.position = (540, 300)
+        self.enemy.cshape.center = (540, 300)
+        self.card_i = 0
+        random.shuffle(self.player.decks)
+        
+        cell_size = 32
+        self.collman = cm.CollisionManagerGrid(0, w, 0, h, cell_size, cell_size)
+        self.schedule(self.game_loop)
+
+        self.create_cards()
+
+    def game_loop(self, elapsed):
+        self.player.update(elapsed)
+
+    def create_cards(self):
+        cards = []
+        for i in range(4):
+            if self.card_i >= len(self.player.decks):
+                random.shuffle(self.player.decks)
+                self.card_i = 0
+            cards.append(self.player.decks[self.card_i])
+            cards[i].position = (100 + 100*i, 0)
+            cards[i].cshape.center = (100 + 100*i, 0)
+            self.add(cards[i])
+            self.collman.add(cards[i])
+            self.card_i += 1
+            
+
+def new_battle(player, enemy):
+    scenario = sc.get_battle_scenario()
+    background = scenario.get_background()
+    hud = Move_HUD()
+    game_layer = BattleLayer(hud, scenario, player, enemy)
+    return cocos.scene.Scene(background, game_layer, hud)

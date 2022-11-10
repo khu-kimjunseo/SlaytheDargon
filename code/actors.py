@@ -1,6 +1,6 @@
 import math
-
 from collections import defaultdict
+import random
 
 from pyglet.window import key
 
@@ -10,12 +10,10 @@ import cocos.actions as ac
 import cocos.euclid as eu
 import cocos.collision_model as cm
 from cocos.director import director
-from cocos.scenes.transitions import FadeTRTransition
 
 import pyglet.image
 from pyglet.image import Animation
 
-from gamelayer import new_battle
 
 
 class Actor(cocos.sprite.Sprite):
@@ -43,6 +41,9 @@ class Player(Actor):
         self.speed = eu.Vector2(100, 100)
         self.maxhp = 70
         self.hp = self.maxhp
+        self.armor = 0
+        self.decks = [Attack(), Attack(), Attack(), Attack(), Attack(), Defense(), Defense(), Defense(), Defense(), Defense()]
+        
 
     def update(self, elapsed):
         pressed = Player.KEYS_PRESSED
@@ -64,15 +65,42 @@ class Player(Actor):
 
     def collide(self, other):
         if isinstance(other, Enemy):
-            director.push(FadeTRTransition(new_battle(), duration=2))
+            return True
+        return False
 
 class Enemy(Actor):
     def __init__(self, img, x, y):
         super(Enemy, self).__init__(img, x, y)
         self.speed = eu.Vector2(100,100)
+        self.hp = 10
+
+attack_card = 'image/Card/Card.png'
+defense_card = 'image/Card/Card.png'
+
+class Card(cocos.sprite.Sprite):
+    def __init__(self, img):
+        super(Card, self).__init__(img)
+        self.scale = 0.15
+        self._cshape = cm.CircleShape(self.position,
+                                      self.width * 0.5)
+
+    @property #getter
+    def cshape(self):
+        self._cshape.center = eu.Vector2(self.x, self.y)
+        return self._cshape
 
 
+class Attack(Card):
+    def __init__(self):
+        super(Attack, self).__init__(attack_card)
+        self.color = (255, 0, 0)
+        self.damage = 6
 
+class Defense(Card):
+    def __init__(self):
+        super(Defense, self).__init__(defense_card)
+        self.color = (0, 255, 0)
+        self.armor = 5
 
 """
 raw = pyglet.image.load('assets/explosion.png')

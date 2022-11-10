@@ -2,7 +2,8 @@ import cocos.tiles
 import cocos.actions as ac
 
 map_image = 'image/untitled.tmx'
-map_layer = 'map0'
+move_map = 'map0'
+battle_map = 'map1'
 
 class Scenario(object):
     def __init__(self, tmx_map):
@@ -16,6 +17,10 @@ class Scenario(object):
         return bg
 
 
-def get_scenario():
-    sc = Scenario(map_layer)
+def get_move_scenario():
+    sc = Scenario(move_map)
+    return sc
+
+def get_battle_scenario():
+    sc = Scenario(battle_map)
     return sc

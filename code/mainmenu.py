@@ -12,7 +12,7 @@ from gamelayer import new_game
 
 class MainMenu(cocos.menu.Menu):
     def __init__(self):
-        super(MainMenu, self).__init__('Slay the Dragon')
+        super(MainMenu, self).__init__('Hello World')
 
         self.font_title['font_name'] = 'Oswald'
         self.font_item['font_name'] = 'Oswald'
