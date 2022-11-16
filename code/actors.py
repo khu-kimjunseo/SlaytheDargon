@@ -42,6 +42,7 @@ class Player(Actor):
         self.maxhp = 70
         self.hp = self.maxhp
         self.armor = 0
+        self.cost = 3
         self.decks = [Attack(), Attack(), Attack(), Attack(), Attack(), Defense(), Defense(), Defense(), Defense(), Defense()]
         
 
@@ -72,7 +73,8 @@ class Enemy(Actor):
     def __init__(self, img, x, y):
         super(Enemy, self).__init__(img, x, y)
         self.speed = eu.Vector2(100,100)
-        self.hp = 10
+        self.hp = 50
+        self.damage = 10
 
 attack_card = 'image/Card/Card.png'
 defense_card = 'image/Card/Card.png'
@@ -81,6 +83,7 @@ class Card(cocos.sprite.Sprite):
     def __init__(self, img):
         super(Card, self).__init__(img)
         self.scale = 0.15
+        self.cost = 1
         self._cshape = cm.CircleShape(self.position,
                                       self.width * 0.5)
 
@@ -89,18 +92,27 @@ class Card(cocos.sprite.Sprite):
         self._cshape.center = eu.Vector2(self.x, self.y)
         return self._cshape
 
+    def activate(self):
+        pass
+
 
 class Attack(Card):
     def __init__(self):
         super(Attack, self).__init__(attack_card)
         self.color = (255, 0, 0)
         self.damage = 6
+    
+    def activate(self):
+        self.parent.attack(self.damage)
 
 class Defense(Card):
     def __init__(self):
         super(Defense, self).__init__(defense_card)
         self.color = (0, 255, 0)
         self.armor = 5
+
+    def activate(self):
+        self.parent.defense(self.armor)
 
 """
 raw = pyglet.image.load('assets/explosion.png')
