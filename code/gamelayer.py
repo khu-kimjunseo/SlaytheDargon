@@ -17,7 +17,7 @@ import scenario as sc
 
 player_img = 'assets/tank.png'
 
-class MoveLayer(cocos.layer.Layer):
+class MoveLayer(cocos.layer.ScrollableLayer):
     is_event_handler = True
 
     def on_key_press(self, k, _):
@@ -28,12 +28,12 @@ class MoveLayer(cocos.layer.Layer):
 
     def __init__(self, hud, scenario):
         super(MoveLayer, self).__init__()
+        
         self.hud = hud
         w, h = director.get_window_size()
-        self.width = w
-        self.height = h
+        px_w, px_h = scenario.get_map_size()
 
-        self.player = actors.Player(player_img, w * 0.5, 50)
+        self.player = actors.Player(player_img, px_w * 0.5, 50)
         self.add(self.player)
         self.enemy0 = actors.Enemy(player_img, 300, 300)
         self.add(self.enemy0)
@@ -44,6 +44,7 @@ class MoveLayer(cocos.layer.Layer):
 
     def game_loop(self, elapsed):
         self.player.update(elapsed)
+        self.parent.set_focus(self.player.position[0], self.player.position[1])
 
         self.collman.clear()
         for _, node in self.children:
@@ -94,7 +95,10 @@ def new_game():
     background = scenario.get_background()
     hud = Move_HUD()
     game_layer = MoveLayer(hud, scenario)
-    return cocos.scene.Scene(background, game_layer, hud)
+    scroller = cocos.layer.ScrollingManager()
+    scroller.add(background)
+    scroller.add(game_layer, z=1)
+    return cocos.scene.Scene(scroller, hud)
 
 def game_over():
     w, h = director.get_window_size()
@@ -181,6 +185,7 @@ class BattleLayer(cocos.layer.Layer):
             self.delete_cards()
             self.create_cards()
             self.player.cost = 3
+            self.hud.update_cost(self.player.cost)
             self.player.armor = 0
             self.hud.update_armor(self.player.armor)
 

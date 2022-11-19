@@ -1,4 +1,5 @@
 from cocos.director import director
+import cocos.layer
 
 import pyglet.font
 import pyglet.resource

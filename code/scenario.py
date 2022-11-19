@@ -1,26 +1,31 @@
 import cocos.tiles
-import cocos.actions as ac
+from cocos.director import director
 
-map_image = 'image/untitled.tmx'
-move_map = 'map0'
+move_map_image = 'image/Movemap.tmx'
+battle_map_image = 'image/Battlemap.tmx'
+move_map = 'map1'
 battle_map = 'map1'
 
 class Scenario(object):
-    def __init__(self, tmx_map):
-        self.tmx_map = tmx_map
+    def __init__(self, map_image, tmx_map):
+        self.map = cocos.tiles.load(map_image)
+        self.bg = self.map[tmx_map]
         self._actions = None
 
     def get_background(self):
-        tmx_map = cocos.tiles.load(map_image)
-        bg = tmx_map[self.tmx_map]
-        bg.set_view(0, 0, bg.px_width, bg.px_height)
-        return bg
+        self.bg.set_view(0, 0, self.bg.px_width, self.bg.px_height)
+        return self.bg
+
+    def get_map_size(self):
+        w = self.bg.px_width
+        h = self.bg.px_height
+        return w, h
 
 
 def get_move_scenario():
-    sc = Scenario(move_map)
+    sc = Scenario(move_map_image, move_map)
     return sc
 
 def get_battle_scenario():
-    sc = Scenario(battle_map)
+    sc = Scenario(battle_map_image, battle_map)
     return sc

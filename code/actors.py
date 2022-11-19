@@ -60,7 +60,7 @@ class Player(Actor):
             new_y = pos[1] + self.speed.y * y * elapsed
             h = self.height * 0.5
 
-            if w <= new_x <= self.parent.width - w and h <= new_y <= self.parent.height - h:
+            if w <= new_x <= 1600 - w and h <= new_y <= 1600 - h:
                 self.position = (new_x, new_y)
             self.cshape.center = self.position
 
