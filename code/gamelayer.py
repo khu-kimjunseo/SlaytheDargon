@@ -39,7 +39,7 @@ class MoveLayer(cocos.layer.ScrollableLayer):
         self.add(self.enemy0)
 
         cell_size = 32
-        self.collman = cm.CollisionManagerGrid(0, w, 0, h, cell_size, cell_size)
+        self.collman = cm.CollisionManagerGrid(0, px_w, 0, px_h, cell_size, cell_size)
         self.schedule(self.game_loop)
 
     def game_loop(self, elapsed):
@@ -49,8 +49,8 @@ class MoveLayer(cocos.layer.ScrollableLayer):
         self.collman.clear()
         for _, node in self.children:
             self.collman.add(node)
-            if not self.collman.knows(node):
-                self.remove(node)
+            # if not self.collman.knows(node):
+                # self.remove(node)
         for _, node in self.children:
             if isinstance(node, actors.Player):
                 enemy = self.collide(node)
