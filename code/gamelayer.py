@@ -49,8 +49,8 @@ class MoveLayer(cocos.layer.ScrollableLayer):
         self.collman.clear()
         for _, node in self.children:
             self.collman.add(node)
-            if not self.collman.knows(node):
-                self.remove(node)
+            # if not self.collman.knows(node):
+                # self.remove(node)
         for _, node in self.children:
             if isinstance(node, actors.Player):
                 enemy = self.collide(node)
