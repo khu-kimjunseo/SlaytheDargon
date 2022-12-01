@@ -3,7 +3,7 @@ import cocos.scene
 import cocos.layer
 import cocos.actions as ac
 from cocos.director import director
-from cocos.scenes.transitions import FadeTRTransition
+from cocos.scenes.transitions import SlideInBTransition
 
 import pyglet.app
 
@@ -29,7 +29,7 @@ class MainMenu(cocos.menu.Menu):
         self.create_menu(items, ac.ScaleTo(1.25, duration=0.25), ac.ScaleTo(1.0, duration=0.25))
 
     def on_new_game(self):
-        director.push(new_game())
+        director.push(SlideInBTransition(new_game(), duration = 1))
 
     def show_fps(self, val):
         director.show_FPS = val

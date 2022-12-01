@@ -3,19 +3,18 @@ import random
 from pyglet.window import key
 
 from cocos.director import director
-from cocos.scenes.transitions import SplitColsTransition, FadeTransition
+from cocos.scenes.transitions import TurnOffTilesTransition
 import cocos.layer
 import cocos.scene
+import cocos.sprite
 import cocos.text
 import cocos.actions as ac
 import cocos.collision_model as cm
-from cocos.scenes.transitions import FadeTRTransition
 
 import actors
 import mainmenu
 import scenario as sc
 
-player_img = 'assets/tank.png'
 
 class MoveLayer(cocos.layer.ScrollableLayer):
     is_event_handler = True
@@ -33,10 +32,12 @@ class MoveLayer(cocos.layer.ScrollableLayer):
         w, h = director.get_window_size()
         px_w, px_h = scenario.get_map_size()
 
-        self.player = actors.Player(player_img, px_w * 0.5, 50)
+        self.player = actors.Player(px_w * 0.5, 50)
         self.add(self.player)
-        self.enemy0 = actors.Enemy(player_img, 300, 300)
+        self.enemy0 = actors.Goblin(px_w * 0.5, 150)
         self.add(self.enemy0)
+        self.enemy1 = actors.Goblin(px_w * 0.5, 300)
+        self.add(self.enemy1)
 
         cell_size = 32
         self.collman = cm.CollisionManagerGrid(0, px_w, 0, px_h, cell_size, cell_size)
@@ -55,7 +56,7 @@ class MoveLayer(cocos.layer.ScrollableLayer):
             if isinstance(node, actors.Player):
                 enemy = self.collide(node)
                 if enemy is not None:
-                    director.push(FadeTRTransition(new_battle(node, enemy), duration=2))
+                    director.push(TurnOffTilesTransition(new_battle(node, enemy), duration=2))
         
         for _, node in self.children:
             if isinstance(node, actors.Enemy):
@@ -115,14 +116,27 @@ def game_over():
 
 class BattleLayer(cocos.layer.Layer):
     is_event_handler = True
-    
+
+    PLAYER = 1
+    ENEMY = -1
+
+    def on_key_press(self, k, _):
+        if self.enemy.hp <= 0:
+            self.player.position = self.return_pos
+            director.pop()
+
     def on_mouse_press(self, x, y, buttons, mod):
-        cards = self.collman.objs_touching_point(x, y)
-        if len(cards):
-            card = next(iter(cards))
-            self.player.cost -= 1
-            card.activate()
-            card.kill()
+        if self.enemy.hp > 0:
+            objs = self.collman.objs_touching_point(x, y)
+            if len(objs):
+                if isinstance(next(iter(objs)), actors.Card):
+                    card = next(iter(objs))
+                    if card.is_usable(self.player.cost) == True:
+                        self.player.cost -= card.cost
+                        card.activate()
+                        card.kill()
+                elif isinstance(next(iter(objs)), actors.End_Button):
+                    self.turn = BattleLayer.ENEMY
 
     def __init__(self, hud, scenario, player, enemy):
         super(BattleLayer, self).__init__()
@@ -135,7 +149,11 @@ class BattleLayer(cocos.layer.Layer):
         self.enemy = enemy
         self.add(self.enemy)
 
-        self.movelayer = director.scene_stack[-1]
+        self.end_delay = 0
+        self.end_button = actors.End_Button(w * 0.8, h * 0.2)
+        self.add(self.end_button)
+        self.turn = BattleLayer.PLAYER
+        # self.movelayer = director.scene_stack[-1]
 
         self.return_pos = self.player.position
 
@@ -146,9 +164,11 @@ class BattleLayer(cocos.layer.Layer):
         self.card_i = 0
         random.shuffle(self.player.decks)
         
-        self.attack()
-        self.defense()
-        self.enemy_attack()
+        self.hud.update_enemy_hp(self.enemy.hp)
+        self.hud.update_enemy_damage(self.enemy.damage)
+        self.hud.update_player_hp(self.player.hp)
+        self.hud.update_armor(self.player.armor)
+        self.hud.update_cost(self.player.cost)
 
         cell_size = 32
         self.collman = cm.CollisionManagerGrid(0, w, 0, h, cell_size, cell_size)
@@ -157,54 +177,64 @@ class BattleLayer(cocos.layer.Layer):
         self.create_cards()
 
     def attack(self, damage=0):
+        if damage != 0:
+            self.player.do(ac.MoveBy((100,0), duration=0.125) + ac.MoveBy((-100,0), duration=0.125))
         self.enemy.hp -= damage
         self.hud.update_enemy_hp(self.enemy.hp)
         self.hud.update_cost(self.player.cost)
+        # 적을 물리쳤을 때 콜되는 함수로 빼기
+        if self.enemy.hp <= 0:
+            self.enemy.do(ac.FadeOut(1))
+            self.player.experience = 1
+            self.player.cost = 3
+            for card in self.player.decks:
+                card.enforce()
 
     def defense(self, armor=0):
         self.player.armor += armor
         self.hud.update_armor(self.player.armor)
         self.hud.update_cost(self.player.cost)
 
-    def enemy_attack(self, add_damage=0):
-        damage = self.enemy.damage + add_damage - self.player.armor
+    def enemy_attack(self):
+        damage = self.enemy.damage - self.player.armor
         if damage > 0:
             self.player.hp -= damage
         self.hud.update_player_hp(self.player.hp)
         
     def game_loop(self, elapsed):
         if self.enemy.hp <= 0:
-            self.player.position = self.return_pos
-            self.enemy.kill()
+            self.end_delay += elapsed
+            if self.end_delay >= 1.5:
+                temp = Win_HUD()
+                self.parent.add(temp)
+            # self.enemy.kill()
             # self.movelayer.remove(self.enemy)
-            director.pop()
             
-        if self.player.cost == 0:
-            add_damage = random.randint(1,5)
-            self.enemy_attack(add_damage)
+        if self.turn == BattleLayer.ENEMY:
+            self.enemy_attack()
+            self.enemy.gen_damage()
+            self.hud.update_enemy_damage(self.enemy.damage)
             self.delete_cards()
             self.create_cards()
             self.player.cost = 3
             self.hud.update_cost(self.player.cost)
             self.player.armor = 0
             self.hud.update_armor(self.player.armor)
-
-        if self.player.hp <= 0:
-            self.player.position = self.return_pos
-            director.pop()
+            self.turn = BattleLayer.PLAYER
 
     def create_cards(self):
         self.collman.clear()
-        cards = []
+        self.collman.add(self.end_button)
+        self.cards = []
         for i in range(5):
             if self.card_i >= len(self.player.decks):
                 random.shuffle(self.player.decks)
                 self.card_i = 0
-            cards.append(self.player.decks[self.card_i])
-            cards[i].position = (0.5 * self.width + 100*(i-2), 0)
-            cards[i].cshape.center = (0.5 * self.width + 100*(i-2), 0)
-            self.add(cards[i])
-            self.collman.add(cards[i])
+            self.cards.append(self.player.decks[self.card_i])
+            self.cards[i].position = (0.5 * self.width + 100*(i-2), 0)
+            self.cards[i].cshape.center = (0.5 * self.width + 100*(i-2), 0)
+            self.add(self.cards[i])
+            self.collman.add(self.cards[i])
             self.card_i += 1
 
     def delete_cards(self):
@@ -212,7 +242,7 @@ class BattleLayer(cocos.layer.Layer):
             if isinstance(node, actors.Card):
                 node.kill()
             
-class Battle_HUD(cocos.layer.Layer):
+class Battle_HUD(cocos.layer.Layer):        
     def __init__(self):
         super(Battle_HUD, self).__init__()
         w, h = director.get_window_size()
@@ -220,6 +250,7 @@ class Battle_HUD(cocos.layer.Layer):
         self.player_armor = self._create_text(60, h-70)
         self.player_cost = self._create_text(60, h-100)
         self.enemy_hp = self._create_text(w-60, h-40)
+        self.enemy_damage = self._create_text(w-60, h-70)
 
     def _create_text(self, x, y):
         text = cocos.text.Label(font_size=18, font_name='Oswald',
@@ -239,6 +270,25 @@ class Battle_HUD(cocos.layer.Layer):
 
     def update_armor(self, armor):
         self.player_armor.element.text = 'Armor: %s' % armor
+
+    def update_enemy_damage(self, damage):
+        self.enemy_damage.element.text = 'Damage: %s' % damage
+
+class Win_HUD(cocos.layer.Layer):
+    def __init__(self):
+        super(Win_HUD, self).__init__()
+        w, h = director.get_window_size()
+        self.message = self._create_text(w/2, h/2, 40)
+        self.message2 = self._create_text(w/2, h/2-45, 25)
+        self.message.element.text = 'You Win!'
+        self.message2.element.text = 'Press any key to exit.'
+    
+    def _create_text(self, x, y, size):
+        text = cocos.text.Label(font_size=size, font_name='Oswald',
+                                anchor_x='center', anchor_y='center')
+        text.position = (x, y)
+        self.add(text)
+        return text
 
 def new_battle(player, enemy):
     scenario = sc.get_battle_scenario()
