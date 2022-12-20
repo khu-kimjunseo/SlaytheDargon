@@ -34,17 +34,23 @@ class MoveLayer(cocos.layer.ScrollableLayer):
 
         self.player = actors.Player(px_w * 0.5, 50)
         self.add(self.player)
-        self.enemy0 = actors.Goblin(px_w * 0.5, 150)
-        self.add(self.enemy0)
-        self.enemy1 = actors.Goblin(px_w * 0.5, 300)
-        self.add(self.enemy1)
+
+        self.enemy = []
+        for i in range(10):
+            x = random.randint(0, px_w)
+            y = random.randint(200, px_h)
+            self.enemy.append(actors.Demon(x, y))
+            self.add(self.enemy[i])
+
+        self.dragon = actors.Dragon(200, px_h-200)
+        self.add(self.dragon)
 
         cell_size = 32
         self.collman = cm.CollisionManagerGrid(0, px_w, 0, px_h, cell_size, cell_size)
         self.schedule(self.game_loop)
 
     def game_loop(self, elapsed):
-        self.player.update(elapsed)
+        self.player.update(elapsed, 'move')
         self.parent.set_focus(self.player.position[0], self.player.position[1])
 
         self.collman.clear()
@@ -129,14 +135,16 @@ class BattleLayer(cocos.layer.Layer):
         if self.enemy.hp > 0:
             objs = self.collman.objs_touching_point(x, y)
             if len(objs):
-                if isinstance(next(iter(objs)), actors.Card):
+                if isinstance(next(iter(objs)), actors.Card) and self.turn == BattleLayer.PLAYER:
                     card = next(iter(objs))
                     if card.is_usable(self.player.cost) == True:
                         self.player.cost -= card.cost
                         card.activate()
                         card.kill()
-                elif isinstance(next(iter(objs)), actors.End_Button):
+                elif isinstance(next(iter(objs)), actors.End_Button) and self.turn == BattleLayer.PLAYER:
+                    self.turn_delay = 0
                     self.turn = BattleLayer.ENEMY
+                    BattleLayer.is_event_handler = False
 
     def __init__(self, hud, scenario, player, enemy):
         super(BattleLayer, self).__init__()
@@ -150,6 +158,7 @@ class BattleLayer(cocos.layer.Layer):
         self.add(self.enemy)
 
         self.end_delay = 0
+        self.turn_delay = 0
         self.end_button = actors.End_Button(w * 0.8, h * 0.2)
         self.add(self.end_button)
         self.turn = BattleLayer.PLAYER
@@ -157,10 +166,11 @@ class BattleLayer(cocos.layer.Layer):
 
         self.return_pos = self.player.position
 
-        self.player.position = (200, 0.75*self.height)
-        self.player.cshape.center = (200, 0.75*self.height)
-        self.enemy.position = (self.width-200, 0.75*self.height)
-        self.enemy.cshape.center = (self.width-200, 0.75*self.height)
+        self.player.position = (200, 0.5*self.height)
+        self.player.cshape.center = (200, 0.5*self.height)
+        self.enemy.position = (self.width-200, 0.7*self.height)
+        self.enemy.cshape.center = (self.width-200, 0.7*self.height)
+        self.enemy.scale = 3
         self.card_i = 0
         random.shuffle(self.player.decks)
         
@@ -178,7 +188,8 @@ class BattleLayer(cocos.layer.Layer):
 
     def attack(self, damage=0):
         if damage != 0:
-            self.player.do(ac.MoveBy((100,0), duration=0.125) + ac.MoveBy((-100,0), duration=0.125))
+            self.player.do(ac.MoveBy((200,0), duration=0.125) + ac.MoveBy((-200,0), duration=0.125))
+            self.player.update(0, 'attack')
         self.enemy.hp -= damage
         self.hud.update_enemy_hp(self.enemy.hp)
         self.hud.update_cost(self.player.cost)
@@ -196,31 +207,55 @@ class BattleLayer(cocos.layer.Layer):
         self.hud.update_cost(self.player.cost)
 
     def enemy_attack(self):
+        self.enemy.do(ac.Delay(1) + ac.MoveBy((-100, 0), duration = 0.4) + ac.MoveBy((100, 0), duration = 0.4))
         damage = self.enemy.damage - self.player.armor
         if damage > 0:
             self.player.hp -= damage
-        self.hud.update_player_hp(self.player.hp)
+        
         
     def game_loop(self, elapsed):
+        if self.player.position == (200, 0.5*self.height):
+            self.player.update(0, 'battle')
+        else:
+            self.player.update(0, 'attack')
+
         if self.enemy.hp <= 0:
             self.end_delay += elapsed
+            BattleLayer.is_event_handler = False
             if self.end_delay >= 1.5:
-                temp = Win_HUD()
-                self.parent.add(temp)
+                win = Win_HUD()
+                self.parent.add(win)
+                BattleLayer.is_event_handler = True
             # self.enemy.kill()
             # self.movelayer.remove(self.enemy)
             
         if self.turn == BattleLayer.ENEMY:
-            self.enemy_attack()
-            self.enemy.gen_damage()
-            self.hud.update_enemy_damage(self.enemy.damage)
-            self.delete_cards()
-            self.create_cards()
-            self.player.cost = 3
-            self.hud.update_cost(self.player.cost)
-            self.player.armor = 0
-            self.hud.update_armor(self.player.armor)
-            self.turn = BattleLayer.PLAYER
+            if self.turn_delay == 0:
+                self.hud.update_turn_msg(self.turn)
+                self.enemy_attack()
+                self.enemy.update(0, 'attack')
+            self.turn_delay += elapsed
+            if self.turn_delay >= 1.2:
+                self.enemy.update(0, 'battle')
+                self.hud.update_player_hp(self.player.hp)
+            if self.turn_delay >= 1.6:
+                self.enemy.gen_damage()
+                self.hud.update_enemy_damage(self.enemy.damage)
+                self.delete_cards()
+                self.create_cards()
+                self.player.cost = 3
+                self.hud.update_cost(self.player.cost)
+                self.player.armor = 0
+                self.hud.update_armor(self.player.armor)
+
+                self.turn = BattleLayer.PLAYER
+                self.turn_delay = 0
+
+        if self.turn == BattleLayer.PLAYER:
+            if self.turn_delay == 0:
+                self.hud.update_turn_msg(self.turn)
+            self.turn_delay += elapsed
+            
 
     def create_cards(self):
         self.collman.clear()
@@ -246,14 +281,22 @@ class Battle_HUD(cocos.layer.Layer):
     def __init__(self):
         super(Battle_HUD, self).__init__()
         w, h = director.get_window_size()
+
         self.player_hp = self._create_text(60, h-40)
         self.player_armor = self._create_text(60, h-70)
         self.player_cost = self._create_text(60, h-100)
         self.enemy_hp = self._create_text(w-60, h-40)
         self.enemy_damage = self._create_text(w-60, h-70)
 
-    def _create_text(self, x, y):
-        text = cocos.text.Label(font_size=18, font_name='Oswald',
+        self.turn_player = self._create_text(w/2, h/2, 40)
+        self.turn_player.element.text = 'Your Turn'
+        self.turn_player.opacity = 0
+        self.turn_enemy = self._create_text(w/2, h/2, 40)
+        self.turn_enemy.element.text = 'Enemy Turn'
+        self.turn_enemy.opacity = 0
+
+    def _create_text(self, x, y, size = 18):
+        text = cocos.text.Label(font_size=size, font_name='Oswald',
                                 anchor_x='center', anchor_y='center')
         text.position = (x, y)
         self.add(text)
@@ -273,6 +316,12 @@ class Battle_HUD(cocos.layer.Layer):
 
     def update_enemy_damage(self, damage):
         self.enemy_damage.element.text = 'Damage: %s' % damage
+    
+    def update_turn_msg(self, turn):
+        if turn == BattleLayer.PLAYER:
+            self.turn_player.do(ac.FadeIn(0.5) + ac.FadeOut(0.5))
+        elif turn == BattleLayer.ENEMY:
+            self.turn_enemy.do(ac.FadeIn(0.5) + ac.FadeOut(0.5))
 
 class Win_HUD(cocos.layer.Layer):
     def __init__(self):

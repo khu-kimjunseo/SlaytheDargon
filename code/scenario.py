@@ -2,7 +2,7 @@ import cocos.tiles
 from cocos.director import director
 
 move_map_image = 'image/Movemap.tmx'
-battle_map_image = 'image/Battlemap.tmx'
+battle_map_image = 'battlemap/Battlemap.tmx'
 move_map = 'map1'
 battle_map = 'map1'
 
